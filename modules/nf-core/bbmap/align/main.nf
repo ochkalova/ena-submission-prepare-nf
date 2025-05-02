@@ -12,9 +12,10 @@ process BBMAP_ALIGN {
     path ref
 
     output:
-    tuple val(meta), path("*.bam"), emit: bam
-    tuple val(meta), path("*.log"), emit: log
-    path "versions.yml"           , emit: versions
+    tuple val(meta), path("*.bam")        , emit: bam
+    tuple val(meta), path("*coverage.txt"), emit: coverage,  optional: true
+    tuple val(meta), path("*.log")        , emit: log
+    path "versions.yml"                   , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
