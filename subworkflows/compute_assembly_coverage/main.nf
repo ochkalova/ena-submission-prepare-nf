@@ -36,12 +36,12 @@ workflow  COMPUTE_ASSEMBLY_COVERAGE {
         .join(CONCATENATE_FORWARD.out.file_out)
         .join(CONCATENATE_REVERSE.out.file_out)
         .multiMap { id, assembly, forward_concatenated, reverse_concatenated ->
-            assembly: [id, assembly ]
+            assembly: assembly
             reads: [id, [forward_concatenated, reverse_concatenated] ]
         }
         .set { bbmap_input_ch }
 
-    BBMAP_ALIGN(bbmap_input_ch.assembly, bbmap_input_ch.reads)
+    BBMAP_ALIGN(bbmap_input_ch.reads, bbmap_input_ch.assembly)
 
     // emit:
     
