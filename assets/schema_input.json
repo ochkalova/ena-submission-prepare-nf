@@ -1,0 +1,31 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "",
+    "title": "params.input schema",
+    "description": "Schema for the file provided with params.input",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "metagenome_id": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Metagenome accession must be provided and cannot contain spaces",
+                "meta": ["id"]
+            },
+            "metagenome_fasta": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+$",
+                "description": "Fasta file for assembly, cannot contain spaces and must have extension '.fna', '.fasta', '.fa', '.fna.gz', '.fasta.gz' or '.fa.gz'"
+            },
+            "run_ids": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Filtered genome accession must be provided and cannot contain spaces"
+            }
+        },
+        "required": ["metagenome_id", "metagenome_fasta"]
+    }
+}
