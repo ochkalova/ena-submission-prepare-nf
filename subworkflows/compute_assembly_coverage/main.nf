@@ -27,17 +27,36 @@ workflow  COMPUTE_ASSEMBLY_COVERAGE {
             forward: [id, reads_accessions[0] ]
             reverse: [id, reads_accessions[1] ]
         }
-        .set { cat_input_ch }
-    
-    CONCATENATE_FORWARD(cat_input_ch.forward.groupTuple())
-    CONCATENATE_REVERSE(cat_input_ch.reverse.groupTuple())
+        .set { downloaded_reads_ch }
+
+    downloaded_reads_ch.forward
+        .groupTuple()
+        .branch { meta, reads_list ->
+            single: reads_list.size() == 1
+            multi: reads_list.size() > 1
+        }
+        .set { forward_reads_ch }
+
+    downloaded_reads_ch.reverse
+        .groupTuple()
+        .branch { meta, reads_list ->
+            single: reads_list.size() == 1
+            multi: reads_list.size() > 1
+        }
+        .set { reverse_reads_ch }
+
+    CONCATENATE_FORWARD(forward_reads_ch.multi)
+    CONCATENATE_REVERSE(reverse_reads_ch.multi)
+
+    merged_forward_reads = forward_reads_ch.single.mix(CONCATENATE_FORWARD.out.file_out)
+    merged_reverse_reads = reverse_reads_ch.single.mix(CONCATENATE_REVERSE.out.file_out)
 
     fasta
-        .join(CONCATENATE_FORWARD.out.file_out)
-        .join(CONCATENATE_REVERSE.out.file_out)
-        .multiMap { id, assembly, forward_concatenated, reverse_concatenated ->
+        .join(merged_forward_reads)
+        .join(merged_reverse_reads)
+        .multiMap { id, assembly, forward, reverse ->
             assembly: assembly
-            reads: [id, [forward_concatenated, reverse_concatenated] ]
+            reads: [id, [forward, reverse] ]
         }
         .set { bbmap_input_ch }
 

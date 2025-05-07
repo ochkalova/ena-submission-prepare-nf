@@ -4,8 +4,6 @@ include { COMPUTE_ASSEMBLY_COVERAGE } from '../subworkflows/compute_assembly_cov
 
 workflow PIPELINE {
 
-    println params.input
-
     samplesheet_ch = Channel
         .fromList(samplesheetToList(params.input, "${projectDir}/assets/schema_input.json"))
     
