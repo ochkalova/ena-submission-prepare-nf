@@ -6,12 +6,21 @@ include { BBMAP_ALIGN } from '../../modules/nf-core/bbmap/align/main'
 
 workflow  COMPUTE_ASSEMBLY_COVERAGE {
     take:
-    fasta      // [ meta, path(fasta) ]
-    reads      // [ meta, tuple(reads_acc) ]
+    fasta                      // [ meta, path(fasta) ]
+    assembly_reads_mapping      // [ meta, tuple(reads_acc) ]
 
     main:
+    
+    assembly_reads_mapping
+        .transpose()
+        .map { meta, reads_acc ->
+            [ reads_acc, reads_acc ]
+        }
+        .unique()
+        .set { for_download_ch }
+    
     SRATOOLS_PREFETCH(
-        reads.transpose(),
+        for_download_ch,
         [],   // ncbi_settings
         [],   // certificate
     )
@@ -22,12 +31,40 @@ workflow  COMPUTE_ASSEMBLY_COVERAGE {
         [],   // certificate
     )
 
-    SRATOOLS_FASTERQDUMP.out.reads
-        .multiMap { id, reads_accessions ->
-            forward: [id, reads_accessions[0] ]
-            reverse: [id, reads_accessions[1] ]
+    assembly_reads_mapping                             // [ [[id:ASSEMBLY_1], [SRR1, SRR2]] ]
+        .transpose()                                  // [ [[id:ASSEMBLY_1], SRR1], [[id:ASSEMBLY_1], SRR2] ]
+        .map { meta, read_acc ->
+            [ read_acc, meta ]                        // [ [SRR1, [id:ASSEMBLY_1]], [SRR2, [id:ASSEMBLY_1]] ]
+        }
+        .mix(SRATOOLS_FASTERQDUMP.out.reads)          // [ [SRR1, [id:ASSEMBLY_1]], [SRR2, [id:ASSEMBLY_1]], [SRR1, [SRR1_1.fastq.gz, SRR1_2.fastq.gz]], [SRR2, [SRR2_1.fastq.gz, SRR2_2.fastq.gz]] ]
+        .groupTuple()                                 // [ [SRR1, [[id:ASSEMBLY_1], [SRR1_1.fastq.gz, SRR1_2.fastq.gz]]], [SRR2, [[id:ASSEMBLY_1], [SRR2_1.fastq.gz, SRR2_2.fastq.gz]]] ]
+        .multiMap { read_acc, data ->
+            def meta = data[0]
+            def reads = data[1]
+            forward: [ meta, reads[1] ]               // [ [[id:ASSEMBLY_1], SRR1_1.fastq.gz], [[id:ASSEMBLY_1], SRR2_1.fastq.gz] ]
+            reverse: [ meta, reads[2] ]               // [ [[id:ASSEMBLY_1], SRR1_2.fastq.gz], [[id:ASSEMBLY_1], SRR2_2.fastq.gz] ]
         }
         .set { downloaded_reads_ch }
+
+    // This code below was used when I mainly aligned reads to NOT co-assemblies. 
+    // SRATOOLS_PREFETCH(
+    //     assembly_reads_mapping.transpose(),
+    //     [],   // ncbi_settings
+    //     [],   // certificate
+    // )
+
+    // SRATOOLS_FASTERQDUMP(
+    //     SRATOOLS_PREFETCH.out.sra,
+    //     [],   // ncbi_settings
+    //     [],   // certificate
+    // )
+
+    // SRATOOLS_FASTERQDUMP.out.reads
+    //     .multiMap { meta, reads ->
+    //         forward: [meta, reads[0] ]
+    //         reverse: [meta, reads[1] ]
+    //     }
+    //     .set { downloaded_reads_ch }
 
     downloaded_reads_ch.forward
         .groupTuple()
@@ -48,15 +85,15 @@ workflow  COMPUTE_ASSEMBLY_COVERAGE {
     CONCATENATE_FORWARD(forward_reads_ch.multi)
     CONCATENATE_REVERSE(reverse_reads_ch.multi)
 
-    merged_forward_reads = forward_reads_ch.single.mix(CONCATENATE_FORWARD.out.file_out)
-    merged_reverse_reads = reverse_reads_ch.single.mix(CONCATENATE_REVERSE.out.file_out)
+    merged_forward_reads = forward_reads_ch.single.transpose().mix(CONCATENATE_FORWARD.out.file_out)
+    merged_reverse_reads = reverse_reads_ch.single.transpose().mix(CONCATENATE_REVERSE.out.file_out)
 
     fasta
         .join(merged_forward_reads)
         .join(merged_reverse_reads)
-        .multiMap { id, assembly, forward, reverse ->
+        .multiMap { meta, assembly, forward, reverse ->
             assembly: assembly
-            reads: [id, [forward, reverse] ]
+            reads: [meta, [forward, reverse] ]
         }
         .set { bbmap_input_ch }
 
