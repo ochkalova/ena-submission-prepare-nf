@@ -6,7 +6,7 @@ include { BBMAP_ALIGN } from '../../modules/nf-core/bbmap/align/main'
 
 workflow  COMPUTE_ASSEMBLY_COVERAGE {
     take:
-    fasta                      // [ meta, path(fasta) ]
+    fasta                       // [ meta, path(fasta) ]
     assembly_reads_mapping      // [ meta, tuple(reads_acc) ]
 
     main:
@@ -14,7 +14,7 @@ workflow  COMPUTE_ASSEMBLY_COVERAGE {
     assembly_reads_mapping
         .transpose()
         .map { meta, reads_acc ->
-            [ reads_acc, reads_acc ]
+            [ [id:reads_acc], reads_acc ]
         }
         .unique()
         .set { for_download_ch }
@@ -31,13 +31,13 @@ workflow  COMPUTE_ASSEMBLY_COVERAGE {
         [],   // certificate
     )
 
-    assembly_reads_mapping                             // [ [[id:ASSEMBLY_1], [SRR1, SRR2]] ]
+    assembly_reads_mapping                            // [ [[id:ASSEMBLY_1], [SRR1, SRR2]] ]
         .transpose()                                  // [ [[id:ASSEMBLY_1], SRR1], [[id:ASSEMBLY_1], SRR2] ]
         .map { meta, read_acc ->
-            [ read_acc, meta ]                        // [ [SRR1, [id:ASSEMBLY_1]], [SRR2, [id:ASSEMBLY_1]] ]
+            [ [id:read_acc], meta ]                   // [ [[id:SRR1], [id:ASSEMBLY_1]], [[id:SRR2], [id:ASSEMBLY_1]] ]
         }
-        .mix(SRATOOLS_FASTERQDUMP.out.reads)          // [ [SRR1, [id:ASSEMBLY_1]], [SRR2, [id:ASSEMBLY_1]], [SRR1, [SRR1_1.fastq.gz, SRR1_2.fastq.gz]], [SRR2, [SRR2_1.fastq.gz, SRR2_2.fastq.gz]] ]
-        .groupTuple()                                 // [ [SRR1, [[id:ASSEMBLY_1], [SRR1_1.fastq.gz, SRR1_2.fastq.gz]]], [SRR2, [[id:ASSEMBLY_1], [SRR2_1.fastq.gz, SRR2_2.fastq.gz]]] ]
+        .mix(SRATOOLS_FASTERQDUMP.out.reads)          // [ [[id:SRR1], [id:ASSEMBLY_1]], [[id:SRR2], [id:ASSEMBLY_1]], [[id:SRR1], [SRR1_1.fastq.gz, SRR1_2.fastq.gz]], [[id:SRR2], [SRR2_1.fastq.gz, SRR2_2.fastq.gz]] ]
+        .groupTuple()                                 // [ [[id:SRR1], [[id:ASSEMBLY_1], [SRR1_1.fastq.gz, SRR1_2.fastq.gz]]], [[id:SRR2], [[id:ASSEMBLY_1], [SRR2_1.fastq.gz, SRR2_2.fastq.gz]]] ]
         .multiMap { read_acc, data ->
             def meta = data[0]
             def reads = data[1]
