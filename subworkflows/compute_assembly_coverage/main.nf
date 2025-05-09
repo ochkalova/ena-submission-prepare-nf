@@ -36,13 +36,17 @@ workflow  COMPUTE_ASSEMBLY_COVERAGE {
         .map { meta, read_acc ->
             [ [id:read_acc], meta ]                   // [ [[id:SRR1], [id:ASSEMBLY_1]], [[id:SRR2], [id:ASSEMBLY_1]] ]
         }
+        .groupTuple()
         .mix(SRATOOLS_FASTERQDUMP.out.reads)          // [ [[id:SRR1], [id:ASSEMBLY_1]], [[id:SRR2], [id:ASSEMBLY_1]], [[id:SRR1], [SRR1_1.fastq.gz, SRR1_2.fastq.gz]], [[id:SRR2], [SRR2_1.fastq.gz, SRR2_2.fastq.gz]] ]
         .groupTuple()                                 // [ [[id:SRR1], [[id:ASSEMBLY_1], [SRR1_1.fastq.gz, SRR1_2.fastq.gz]]], [[id:SRR2], [[id:ASSEMBLY_1], [SRR2_1.fastq.gz, SRR2_2.fastq.gz]]] ]
-        .multiMap { read_acc, data ->
-            def meta = data[0]
-            def reads = data[1]
-            forward: [ meta, reads[1] ]               // [ [[id:ASSEMBLY_1], SRR1_1.fastq.gz], [[id:ASSEMBLY_1], SRR2_1.fastq.gz] ]
-            reverse: [ meta, reads[2] ]               // [ [[id:ASSEMBLY_1], SRR1_2.fastq.gz], [[id:ASSEMBLY_1], SRR2_2.fastq.gz] ]
+        .map { meta, data -> 
+            def assembly_list = data[0]
+            def reads_files = data[1]
+            [assembly_list, reads_files] }
+        .transpose(by:0)
+        .multiMap { meta, reads ->
+            forward: [ meta, reads[0] ]               // [ [[id:ASSEMBLY_1], SRR1_1.fastq.gz], [[id:ASSEMBLY_1], SRR2_1.fastq.gz] ]
+            reverse: [ meta, reads[1] ]               // [ [[id:ASSEMBLY_1], SRR1_2.fastq.gz], [[id:ASSEMBLY_1], SRR2_2.fastq.gz] ]
         }
         .set { downloaded_reads_ch }
 
